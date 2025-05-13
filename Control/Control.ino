@@ -25,12 +25,12 @@ const int PULSES_PER_REV = 134*4;  // Adjust to your encoder
 float beamAngleRad = 0;
 
 // ==== Control Gains ====
-const float Kp = 100.0;
-const float Kd = 14.0;
-const float Ktheta = 20.0;
+const float Kp = 30*0;
+const float Kd = 6000*0;
+const float Ktheta = 35;
 
 // ==== Control Variables ====
-float x_marble = 0;
+//float x_marble = 0;
 float v_marble = 0;
 float theta = 0;
 float x_last = 0;
@@ -82,16 +82,15 @@ void setup() {
     pinMode(IN2, OUTPUT);
     pinMode(ENCODERA_PIN, INPUT);
     pinMode(ENCODERB_PIN, INPUT);
-    pinMode(POT_PIN, INPUT);
+    //pinMode(POT_PIN, INPUT);
     attachInterrupt(digitalPinToInterrupt(ENCODERA_PIN), encoderISRA, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ENCODERB_PIN), encoderISRB, CHANGE);
 }
 
 //==== Helper Functions ====
-
 float readMarblePosition() {
-  int potVal = analogRead(POT_PIN);
-  return map(potVal, 0, 1023, -850, 850) / 10000;
+  int potVal = map(analogRead(POT_PIN), 0, 1023, -850, 850);
+  return potVal;
 }
 
 float readBeamAngle() {
@@ -101,7 +100,7 @@ float readBeamAngle() {
 }
 
 void updateVelocity(float x) {
-  v_marble = (x - x_last) / dt;
+  v_marble = (x - x_last) / 10;
   x_last = x;
 }
 
@@ -115,8 +114,13 @@ void applyVoltage(float V) {
   int pwm = (int)(abs(V) / 12.0 * 255.0);
   pwm = constrain(pwm, 0, 255);
   analogWrite(ENA, pwm);
-  digitalWrite(IN1, V >= 0 ? HIGH : LOW);
-  digitalWrite(IN2, V >= 0 ? HIGH : LOW);
+  if (V >= 0) {
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+  } else {
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, HIGH);
+  }
 }
 
 
@@ -125,17 +129,20 @@ void loop() {
   if(currentTime - prevMillis >= 10) {
     prevMillis = currentTime;
 
-    x_marble = readMarblePosition();
+    float x_marble = readMarblePosition() / 10000;
+    Serial.print(x_marble);
     theta = readBeamAngle();
     updateVelocity(x_marble);
     float V_control = computeControl(x_marble, v_marble, theta);
     applyVoltage(V_control);
+    Serial.print("|");
+    Serial.println(theta);
 
     // ==== Debug Print ====
-    Serial.print("x: "); Serial.print(x_marble, 4);
-    Serial.print(" | v: "); Serial.print(v_marble, 4);
-    Serial.print(" | theta: "); Serial.print(theta, 4);
-    Serial.print(" | V: "); Serial.print(V_control, 2);
+    // Serial.print("x: "); Serial.print(x_marble, 4);
+    // Serial.print(" | v: "); Serial.print(v_marble, 4);
+    // Serial.print(" | theta: "); Serial.print(theta, 4);
+    // Serial.print(" | V: "); Serial.print(V_control, 2);
   }
 }
     // // Start motor after 3 seconds
