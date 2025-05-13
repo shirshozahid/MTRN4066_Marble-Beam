@@ -25,9 +25,9 @@ const int PULSES_PER_REV = 134*4;  // Adjust to your encoder
 float beamAngleRad = 0;
 
 // ==== Control Gains ====
-const float Kp = 30*0;
-const float Kd = 6000*0;
-const float Ktheta = 35;
+const float Kp = 100;
+const float Kd = 5000*0;
+const float Ktheta = 50*0;
 
 // ==== Control Variables ====
 //float x_marble = 0;
@@ -96,7 +96,7 @@ float readMarblePosition() {
 float readBeamAngle() {
   float degPerPulse = 360 / PULSES_PER_REV;
   float angleDeg = pulseCount * degPerPulse;
-  return angleDeg * PI / 180.0; // radians
+  return angleDeg; // degrees
 }
 
 void updateVelocity(float x) {
