@@ -1,3 +1,16 @@
+// ==== Old Code ====
+// volatile long pulseCount = 0;
+// unsigned long prevTime = 0;
+// unsigned long prevPulseCount = 0;
+// float rpm = 0;
+
+// unsigned long startTime = 0;  // Variable to store the time when the motor should start
+// const unsigned long motorStartDelay = 5000; // 3 seconds delay before starting the motor
+// const int UPDATE_INTERVAL = 50;
+
+
+
+
 // ==== Pin Definitions ====
 #define ENA 10
 #define IN1 9
@@ -8,7 +21,7 @@
 
 // ==== Encoder Variables ====
 volatile long pulseCount = 0;
-const int PULSES_PER_REV = 134.4*4;  // Adjust to your encoder
+const int PULSES_PER_REV = 134*4;  // Adjust to your encoder
 float beamAngleRad = 0;
 
 // ==== Control Gains ====
@@ -20,18 +33,14 @@ const float Ktheta = 20.0;
 float x_marble = 0;
 float v_marble = 0;
 float theta = 0;
-//float x_last = 0;
+float x_last = 0;
 const float x_want = 0.0;
 
-volatile long pulseCount = 0;
-unsigned long prevTime = 0;
-unsigned long prevPulseCount = 0;
-float rpm = 0;
+// ==== Timing ====
+const float dt = 10; //10 ms
+unsigned long prevMillis = 0;
 
-unsigned long startTime = 0;  // Variable to store the time when the motor should start
-const unsigned long motorStartDelay = 5000; // 3 seconds delay before starting the motor
-const int UPDATE_INTERVAL = 50;
-
+// ==== Encoder Interrupts ====
  void encoderISRA() {
     if(digitalRead(ENCODERA_PIN) == HIGH) { //Rising edge in A
       if (digitalRead(ENCODERB_PIN) == HIGH) { 
@@ -65,42 +74,85 @@ void encoderISRB() {
   }
 }
 
+// ==== Setup ====
 void setup() {
     Serial.begin(115200);
-
     pinMode(ENA, OUTPUT);
     pinMode(IN1, OUTPUT);
     pinMode(IN2, OUTPUT);
     pinMode(ENCODERA_PIN, INPUT);
     pinMode(ENCODERB_PIN, INPUT);
-    
+    pinMode(POT_PIN, INPUT);
     attachInterrupt(digitalPinToInterrupt(ENCODERA_PIN), encoderISRA, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ENCODERB_PIN), encoderISRB, CHANGE);
-
-    // Record the time when the system is powered on
-    startTime = 0;
 }
+
+//==== Helper Functions ====
+
+float readMarblePosition() {
+  int potVal = analogRead(POT_PIN);
+  return map(potVal, 0, 1023, -850, 850) / 10000;
+}
+
+float readBeamAngle() {
+  float degPerPulse = 360 / PULSES_PER_REV;
+  float angleDeg = pulseCount * degPerPulse;
+  return angleDeg * PI / 180.0; // radians
+}
+
+void updateVelocity(float x) {
+  v_marble = (x - x_last) / dt;
+  x_last = x;
+}
+
+float computeControl(float x, float v, float theta) {
+  float V = Kp * (x - x_want) + (Kd * v) - (Ktheta * theta);
+  V = constrain(V, -12.0 , 12.0);
+  return V;
+}
+
+void applyVoltage(float V) {
+  int pwm = (int)(abs(V) / 12.0 * 255.0);
+  pwm = constrain(pwm, 0, 255);
+  analogWrite(ENA, pwm);
+  digitalWrite(IN1, V >= 0 ? HIGH : LOW);
+  digitalWrite(IN2, V >= 0 ? HIGH : LOW);
+}
+
 
 void loop() {
-    unsigned long currentTime = millis();
+  unsigned long currentTime = millis();
+  if(currentTime - prevMillis >= 10) {
+    prevMillis = currentTime;
 
-    // Start motor after 3 seconds
-    if (currentTime - startTime >= motorStartDelay && (analogRead(ENA) == 0)) {
-        analogWrite(ENA, 255);  // Turn on motor at full speed (255)
-        digitalWrite(IN1, HIGH);
-        digitalWrite(IN2, LOW);
-    }
+    x_marble = readMarblePosition();
+    theta = readBeamAngle();
+    updateVelocity(x_marble);
+    float V_control = computeControl(x_marble, v_marble, theta);
+    applyVoltage(V_control);
 
-    // Calculate RPM every second (1000 ms)
-    if (currentTime - prevTime >= UPDATE_INTERVAL) {
-        unsigned long elapsedPulses = (pulseCount - prevPulseCount);
-        prevPulseCount = pulseCount;
-        prevTime = currentTime;
-
-        // Calculate RPM (Assuming pulse per revolution, adjust if needed)
-        rpm = ((float)elapsedPulses / PULSES_PER_REV) * (60 * (1000 / UPDATE_INTERVAL)); 
-        
-        Serial.println(pulseCount);
-    }
+    // ==== Debug Print ====
+    Serial.print("x: "); Serial.print(x_marble, 4);
+    Serial.print(" | v: "); Serial.print(v_marble, 4);
+    Serial.print(" | theta: "); Serial.print(theta, 4);
+    Serial.print(" | V: "); Serial.print(V_control, 2);
+  }
 }
+    // // Start motor after 3 seconds
+    // if (currentTime - startTime >= motorStartDelay && (analogRead(ENA) == 0)) {
+    //     analogWrite(ENA, 255);  // Turn on motor at full speed (255)
+    //     digitalWrite(IN1, HIGH);
+    //     digitalWrite(IN2, LOW);
+    // }
+
+    // // Calculate RPM every second (1000 ms)
+    // if (currentTime - prevTime >= UPDATE_INTERVAL) {
+    //     unsigned long elapsedPulses = (pulseCount - prevPulseCount);
+    //     prevPulseCount = pulseCount;
+    //     prevTime = currentTime;
+
+    //     // Calculate RPM (Assuming pulse per revolution, adjust if needed)
+    //     rpm = ((float)elapsedPulses / PULSES_PER_REV) * (60 * (1000 / UPDATE_INTERVAL)); 
+        
+    //     Serial.println(pulseCount);
 
