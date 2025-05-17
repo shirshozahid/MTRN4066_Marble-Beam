@@ -21,13 +21,13 @@
 
 // ==== Encoder Variables ====
 volatile long pulseCount = 0;
-const int PULSES_PER_REV = 134*4;  // Adjust to your encoder
+const float PULSES_PER_REV = 134.4*4;  // Adjust to your encoder
 float beamAngleRad = 0;
 
 // ==== Control Gains ====
-const float Kp = 50;
-const float Kd = 5*0;
-const float Ktheta = 5*0;
+const float Kp = 99;
+const float Kd = 10;
+const float Ktheta = 0.48;
 
 // ==== Control Variables ====
 //float x_marble = 0;
@@ -36,10 +36,11 @@ float theta;
 float x_last;
 float t_last;
 const float x_want = 0.0;
+float degPerPulse = 360.0 / PULSES_PER_REV;
 
 // ==== Timing ====
 const float dt = 10; //10 ms
-unsigned long prevMillis = 0;
+unsigned long prevMicros = 0;
 
 // ==== Load Variables ====
 const float load_constant = 3.44;
@@ -80,7 +81,7 @@ void encoderISRB() {
 
 // ==== Setup ====
 void setup() {
-    analogReadResolution(10);  // 12 bits = 4096 levels
+    //analogReadResolution(10);  // 12 bits = 4096 levels
     Serial.begin(115200);
     pinMode(ENA, OUTPUT);
     pinMode(IN1, OUTPUT);
@@ -100,7 +101,6 @@ float readMarblePosition() {
 }
 
 float readBeamAngle() {
-  float degPerPulse = 360 / PULSES_PER_REV;
   float angleDeg = pulseCount * degPerPulse;
   return angleDeg; // degrees
 }
@@ -124,7 +124,7 @@ void updateVelocity(float x) {
 
 float computeControl(float x, float v, float theta) {
   float V = Kp * (x - x_want) + (Kd * v) - (Ktheta * theta) + (load_constant*x);
-  V = constrain(V, -9 , 9);
+  V = constrain(V, -10.2 , 10.2);
   return V;
 }
 
@@ -143,18 +143,19 @@ void applyVoltage(float V) {
 
 
 void loop() {
-  unsigned long currentTime = millis();
-  if(currentTime - prevMillis >= 10) {
-    prevMillis = currentTime;
-
+  unsigned long currentTime = micros();
+  if(currentTime - prevMicros >= 2000) {
+    prevMicros = currentTime;
     float x_marble = readMarblePosition() / 1000;
     Serial.print(x_marble);
     theta = readBeamAngle();
     updateVelocity(x_marble);
-    float V_control = computeControl(x_marble, v_marble, theta);
+    float V_control = computeControl(x_marble, v_marble, -theta);
     applyVoltage(V_control);
     Serial.print("|");
-    Serial.println(v_marble);
+    Serial.print(V_control);
+    Serial.print("|");
+    Serial.println(-theta);
 
     // ==== Debug Print ====
     // Serial.print("x: "); Serial.print(x_marble, 4);
@@ -180,4 +181,3 @@ void loop() {
     //     rpm = ((float)elapsedPulses / PULSES_PER_REV) * (60 * (1000 / UPDATE_INTERVAL)); 
         
     //     Serial.println(pulseCount);
-
