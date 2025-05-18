@@ -25,9 +25,9 @@ const float PULSES_PER_REV = 134.4*4;  // Adjust to your encoder
 float beamAngleRad = 0;
 
 // ==== Control Gains ====
-const float Kp = 99;
-const float Kd = 10;
-const float Ktheta = 0.48;
+const float Kp = 315;
+const float Kd = 25;
+const float Ktheta = 0.85;
 
 // ==== Control Variables ====
 //float x_marble = 0;
@@ -35,7 +35,7 @@ float v_marble;
 float theta;
 float x_last;
 float t_last;
-const float x_want = 0.0;
+const float x_want = 0.00;
 float degPerPulse = 360.0 / PULSES_PER_REV;
 
 // ==== Timing ====
@@ -95,10 +95,22 @@ void setup() {
 
 //==== Helper Functions ====
 float readMarblePosition() {
-  int potVal = map(analogRead(POT_PIN), 75, 970, -85, 85);
-  //int potVal = analogRead(POT_PIN);
-  return potVal;
+  // 1) read once
+  int raw = analogRead(POT_PIN);
+
+  // 2) clamp into [75,970]
+  raw = constrain(raw, 75, 970);
+  //  // or:
+  //  if (raw <  75) raw =  75;
+  //  if (raw > 970) raw = 970;
+
+  // 3) map into -85..+85
+  int potVal = map(raw, 75, 970, -85, 85);
+
+  // 4) return as float (meters, etc)
+  return float(potVal);  // if you want metres; otherwise just return potVal
 }
+
 
 float readBeamAngle() {
   float angleDeg = pulseCount * degPerPulse;
@@ -144,18 +156,18 @@ void applyVoltage(float V) {
 
 void loop() {
   unsigned long currentTime = micros();
-  if(currentTime - prevMicros >= 2000) {
+  if(currentTime - prevMicros >= 1000) {
     prevMicros = currentTime;
     float x_marble = readMarblePosition() / 1000;
-    Serial.print(x_marble);
+    //Serial.print(x_marble);
     theta = readBeamAngle();
     updateVelocity(x_marble);
     float V_control = computeControl(x_marble, v_marble, -theta);
     applyVoltage(V_control);
-    Serial.print("|");
-    Serial.print(V_control);
-    Serial.print("|");
-    Serial.println(-theta);
+    //Serial.print("|");
+    //Serial.print(V_control);
+    //Serial.print("|");
+    //Serial.println(-theta);
 
     // ==== Debug Print ====
     // Serial.print("x: "); Serial.print(x_marble, 4);
