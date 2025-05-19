@@ -25,9 +25,9 @@ const float PULSES_PER_REV = 134.4*4;  // Adjust to your encoder
 float beamAngleRad = 0;
 
 // ==== Control Gains ====
-const float Kp = 315;
-const float Kd = 25;
-const float Ktheta = 0.85;
+const float Kp = 212;
+const float Kd = 35.25;
+const float Ktheta = .95;
 
 // ==== Control Variables ====
 //float x_marble = 0;
@@ -35,12 +35,13 @@ float v_marble;
 float theta;
 float x_last;
 float t_last;
-const float x_want = 0.00;
+const float x_want = 0.0;
 float degPerPulse = 360.0 / PULSES_PER_REV;
 
 // ==== Timing ====
 const float dt = 10; //10 ms
 unsigned long prevMicros = 0;
+unsigned long prev_vel_micros = 0;
 
 // ==== Load Variables ====
 const float load_constant = 3.44;
@@ -95,25 +96,15 @@ void setup() {
 
 //==== Helper Functions ====
 float readMarblePosition() {
-  // 1) read once
-  int raw = analogRead(POT_PIN);
-
-  // 2) clamp into [75,970]
-  raw = constrain(raw, 75, 970);
-  //  // or:
-  //  if (raw <  75) raw =  75;
-  //  if (raw > 970) raw = 970;
-
-  // 3) map into -85..+85
-  int potVal = map(raw, 75, 970, -85, 85);
-
-  // 4) return as float (meters, etc)
-  return float(potVal);  // if you want metres; otherwise just return potVal
+  int potVal = map(analogRead(POT_PIN), 75, 970, -85, 85);
+  //int potVal = analogRead(POT_PIN);
+  return potVal;
 }
 
 
 float readBeamAngle() {
   float angleDeg = pulseCount * degPerPulse;
+  constrain(angleDeg, -10, 10);
   return angleDeg; // degrees
 }
 
@@ -135,7 +126,7 @@ void updateVelocity(float x) {
 }
 
 float computeControl(float x, float v, float theta) {
-  float V = Kp * (x - x_want) + (Kd * v) - (Ktheta * theta) + (load_constant*x);
+  float V = Kp * (x - x_want) + (Kd * v) - (Ktheta * theta) + load_constant*(x) + 1.2;
   V = constrain(V, -10.2 , 10.2);
   return V;
 }
@@ -159,13 +150,16 @@ void loop() {
   if(currentTime - prevMicros >= 1000) {
     prevMicros = currentTime;
     float x_marble = readMarblePosition() / 1000;
-    //Serial.print(x_marble);
+    Serial.print(x_marble);
     theta = readBeamAngle();
-    updateVelocity(x_marble);
+    if(currentTime - prev_vel_micros >= 5000) {
+      updateVelocity(x_marble);
+      prev_vel_micros = currentTime;
+    }
     float V_control = computeControl(x_marble, v_marble, -theta);
     applyVoltage(V_control);
-    //Serial.print("|");
-    //Serial.print(V_control);
+    Serial.print("|");
+    Serial.println(v_marble);
     //Serial.print("|");
     //Serial.println(-theta);
 
