@@ -26,8 +26,8 @@ float beamAngleRad = 0;
 
 // ==== Control Gains ====
 const float Kp = 212;
-const float Kd = 35.25;
-const float Ktheta = .95;
+const float Kd = 29.5;
+const float Ktheta = 1;
 
 // ==== Control Variables ====
 //float x_marble = 0;
@@ -35,7 +35,7 @@ float v_marble;
 float theta;
 float x_last;
 float t_last;
-const float x_want = 0.0;
+const float x_want = 0.03;
 float degPerPulse = 360.0 / PULSES_PER_REV;
 
 // ==== Timing ====
@@ -96,7 +96,7 @@ void setup() {
 
 //==== Helper Functions ====
 float readMarblePosition() {
-  int potVal = map(analogRead(POT_PIN), 75, 970, -85, 85);
+  int potVal = map(analogRead(POT_PIN), 40, 980, -85, 85);
   //int potVal = analogRead(POT_PIN);
   return potVal;
 }
@@ -127,12 +127,12 @@ void updateVelocity(float x) {
 
 float computeControl(float x, float v, float theta) {
   float V = Kp * (x - x_want) + (Kd * v) - (Ktheta * theta) + load_constant*(x) + 1.2;
-  V = constrain(V, -10.2 , 10.2);
+  V = constrain(V, -4 , 4);
   return V;
 }
 
 void applyVoltage(float V) {
-  int pwm = (int)(abs(V) / 12 * 255.0);
+  int pwm = (int)(abs(V) / 4 * 255.0);
   pwm = constrain(pwm, 0, 255);
   analogWrite(ENA, pwm);
   if (V >= 0) {
